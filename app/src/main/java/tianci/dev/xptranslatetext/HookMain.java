@@ -46,6 +46,7 @@ public class HookMain implements IXposedHookLoadPackage {
     public static final String TRANSLATION_ID_KEY = "xp_translate_text:translationId";
     public static final String TRANSLATION_IN_PROGRESS_KEY = "xp_translate_text:in_progress";
     public static final String TRANSLATION_IN_PROGRESS_TEXT_KEY = "xp_translate_text:in_progress_text";
+    public static final String PREF_FORCE_WAIT_LOCAL = "force_wait_local";
 
     @Override
     public void handleLoadPackage(final XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
@@ -57,13 +58,16 @@ public class HookMain implements IXposedHookLoadPackage {
 
         String sourceLang = "auto";
         String targetLang = "zh-TW";
+        boolean forceWaitLocal = false;
 
         if (prefs.getFile().canRead()) {
             prefs.reload();
             sourceLang = prefs.getString("source_lang", sourceLang);
             targetLang = prefs.getString("target_lang", targetLang);
+            forceWaitLocal = prefs.getBoolean(PREF_FORCE_WAIT_LOCAL, false);
 
-            XposedBridge.log("sourceLang=" + sourceLang + ", targetLang=" + targetLang);
+            XposedBridge.log("sourceLang=" + sourceLang + ", targetLang=" + targetLang
+                    + ", forceWaitLocal=" + forceWaitLocal);
         } else {
             XposedBridge.log("Cannot read XSharedPreferences => " + prefs.getFile().getAbsolutePath()
                     + ". Fallback to default: auto->zh-TW");
@@ -71,9 +75,10 @@ public class HookMain implements IXposedHookLoadPackage {
 
         final String finalSourceLang = sourceLang;
         final String finalTargetLang = targetLang;
+        final boolean finalForceWaitLocal = forceWaitLocal;
 
         hookTextView(lpparam, finalSourceLang, finalTargetLang);
-        hookStaticLayout(lpparam, finalSourceLang, finalTargetLang);
+        hookStaticLayout(lpparam, finalSourceLang, finalTargetLang, finalForceWaitLocal);
         hookAllCustomSetTextClasss(lpparam, finalSourceLang, finalTargetLang);
         hookWebView(lpparam, finalSourceLang, finalTargetLang);
 
@@ -101,7 +106,10 @@ public class HookMain implements IXposedHookLoadPackage {
      * - If unresolved, try quick local-service translation (background I/O + short await on UI)
      * - If still unresolved, prefetch async and return original layout
      */
-    private void hookStaticLayout(XC_LoadPackage.LoadPackageParam lpparam, String finalSourceLang, String finalTargetLang) {
+    private void hookStaticLayout(XC_LoadPackage.LoadPackageParam lpparam,
+                                  String finalSourceLang,
+                                  String finalTargetLang,
+                                  boolean forceWaitLocal) {
         try {
             XposedHelpers.findAndHookMethod(
                     "android.text.StaticLayout$Builder",
@@ -136,6 +144,8 @@ public class HookMain implements IXposedHookLoadPackage {
                                 if (text instanceof Editable) {
                                     return XposedBridge.invokeOriginalMethod(param.method, param.thisObject, param.args);
                                 }
+
+                                XposedBridge.log(String.format("[ translate ] %s string => %s", param.thisObject.getClass(), text));
 
                                 // Read start/end
                                 int start;
@@ -189,7 +199,7 @@ public class HookMain implements IXposedHookLoadPackage {
                                     // 2) quick local-service sync (short wait) if not all resolved
                                     if (!allResolved) {
                                         boolean nowResolved = MultiSegmentTranslateTask.quickTranslateUnresolvedSegmentsViaLocal(
-                                                segments, finalSourceLang, finalTargetLang, 1000 /*ms*/);
+                                                segments, finalSourceLang, finalTargetLang, 1000 /*ms*/, forceWaitLocal);
                                         if (nowResolved) {
                                             allResolved = true;
                                         }

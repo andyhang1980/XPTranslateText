@@ -7,6 +7,8 @@
     <string name="lang_section_title">Настройки языка</string>
     <string name="source_lang">Исходный язык</string>
     <string name="target_lang">Целевой язык</string>
+    <string name="force_wait_switch">Отложить показ до окончания перевода</string>
+    <string name="force_wait_hint">Предупреждение: принудительное ожидание может вызвать долгие задержки загрузки или вылет приложения.</string>
     <string name="server_hint">Подсказка: при первом использовании ML Kit может загрузить модели (требуется сеть).</string>
     <string name="model_section_title">Управление моделями</string>
     <string name="manage_models">Управлять загруженными моделями</string>

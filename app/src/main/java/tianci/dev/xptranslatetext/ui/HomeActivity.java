@@ -23,7 +23,6 @@ import com.google.mlkit.nl.translate.TranslateLanguage;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -36,9 +35,12 @@ import java.util.Set;
  */
 public class HomeActivity extends AppCompatActivity {
 
+    private static final String PREF_FORCE_WAIT_LOCAL = "force_wait_local";
+
     private MaterialAutoCompleteTextView sourceDropdown;
     private MaterialAutoCompleteTextView targetDropdown;
     private MaterialSwitch serverSwitch;
+    private MaterialSwitch forceWaitSwitch;
     private TextView statusText;
 
     private SharedPreferences prefs;
@@ -77,6 +79,7 @@ public class HomeActivity extends AppCompatActivity {
         sourceDropdown = findViewById(R.id.spinner_source_lang);
         targetDropdown = findViewById(R.id.spinner_target_lang);
         serverSwitch = findViewById(R.id.switch_server);
+        forceWaitSwitch = findViewById(R.id.switch_force_wait);
         statusText = findViewById(R.id.text_status);
         findViewById(R.id.btn_model_manager).setOnClickListener(v -> {
             startActivity(new Intent(this, ModelManagerActivity.class));
@@ -96,6 +99,11 @@ public class HomeActivity extends AppCompatActivity {
             }
             updateStatusText(checked);
         });
+
+        forceWaitSwitch.setChecked(prefs.getBoolean(PREF_FORCE_WAIT_LOCAL, false));
+        forceWaitSwitch.setOnCheckedChangeListener((buttonView, isChecked) ->
+                prefs.edit().putBoolean(PREF_FORCE_WAIT_LOCAL, isChecked).apply()
+        );
     }
 
     private boolean isXposedModuleEnabled() {

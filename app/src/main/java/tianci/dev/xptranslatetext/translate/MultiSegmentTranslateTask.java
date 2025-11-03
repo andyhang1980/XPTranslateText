@@ -16,9 +16,11 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.net.HttpURLConnection;
+
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.HostnameVerifier;
+
 import java.net.URL;
 import java.net.URLEncoder;
 
@@ -43,8 +45,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.security.KeyStore;
 import java.security.SecureRandom;
+
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.SSLContext;
+
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 
@@ -179,13 +183,15 @@ public class MultiSegmentTranslateTask {
     /**
      * Perform *synchronous* quick local-service translations for unresolved segments.
      * Network I/O happens on background threads; UI thread just waits up to maxWaitMs.
+     * When forceAwaitCompletion is true, waits until all worker tasks finish.
      *
      * @return true if after the quick phase ALL segments are resolved; false otherwise.
      */
     public static boolean quickTranslateUnresolvedSegmentsViaLocal(List<Segment> segments,
                                                                    String srcLang,
                                                                    String tgtLang,
-                                                                   long maxWaitMs) {
+                                                                   long maxWaitMs,
+                                                                   boolean forceAwaitCompletion) {
         // Collect unresolved segments
         final List<Segment> unresolved = new ArrayList<>();
         for (Segment seg : segments) {
@@ -221,7 +227,12 @@ public class MultiSegmentTranslateTask {
                     }
 
                     // Quick local-service call with small timeout
-                    String result = translateByLocalServiceQuick(text, srcLang, tgtLang, cacheKey);
+                    String result;
+                    if (forceAwaitCompletion) {
+                        result = translateByLocalService(text, srcLang, tgtLang, cacheKey);
+                    } else {
+                        result = translateByLocalServiceQuick(text, srcLang, tgtLang, cacheKey);
+                    }
                     if (result != null) {
                         seg.translatedText = result;
                         translationCache.put(cacheKey, result);
@@ -235,9 +246,13 @@ public class MultiSegmentTranslateTask {
         }
 
         try {
-            // Wait up to maxWaitMs
-            latch.await(Math.max(1, maxWaitMs), TimeUnit.MILLISECONDS);
+            if (forceAwaitCompletion) {
+                latch.await();
+            } else {
+                latch.await(Math.max(1, maxWaitMs), TimeUnit.MILLISECONDS);
+            }
         } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
         }
 
         // Check if ALL segments are now resolved
@@ -656,13 +671,15 @@ public class MultiSegmentTranslateTask {
             log("DB put error: " + e);
         }
     }
+
     private static void putTranslationToDatabaseFireAndForget(String cacheKey, String translatedText) {
         if (dbHelper == null) return;
         try {
             DB_EXECUTOR.submit(() -> {
                 try {
                     dbHelper.putTranslation(cacheKey, translatedText);
-                } catch (Throwable ignored) {}
+                } catch (Throwable ignored) {
+                }
                 return null;
             });
         } catch (Throwable ignored) {

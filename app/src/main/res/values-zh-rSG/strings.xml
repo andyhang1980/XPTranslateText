@@ -7,6 +7,8 @@
     <string name="lang_section_title">翻译语言设置</string>
     <string name="source_lang">源语言</string>
     <string name="target_lang">目标语言</string>
+    <string name="force_wait_switch">翻译完成才显示文字</string>
+    <string name="force_wait_hint">警告：强制等待可能导致加载过久或应用闪退。</string>
     <string name="server_hint">提示：首次使用可能需要下载 ML Kit 语言模型（需网络）。</string>
     <string name="translation_first_time_tip">提示：第一次翻译会自动下载模型，过程可能短暂卡住界面；若出现翻译不完整，多半是翻译进度跟不上，请稍候或刷新再试。</string>
     <string name="model_section_title">模型管理</string>

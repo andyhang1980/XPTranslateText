@@ -7,6 +7,8 @@
     <string name="lang_section_title">言語設定</string>
     <string name="source_lang">入力言語</string>
     <string name="target_lang">出力言語</string>
+    <string name="force_wait_switch">翻訳完了まで表示を遅延する</string>
+    <string name="force_wait_hint">警告: 強制待機すると読み込みが長引いたり、アプリがクラッシュする場合があります。</string>
     <string name="server_hint">ヒント: 初回は ML Kit がモデルをダウンロードする場合があります（ネットワークが必要）。</string>
     <string name="model_section_title">モデル管理</string>ㄎ
     <string name="manage_models">ダウンロード済みモデルを管理</string>
