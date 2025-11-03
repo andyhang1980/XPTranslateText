@@ -44,6 +44,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -81,6 +82,7 @@ public class LocalTranslationService extends Service {
     private ServerSocket serverSocket;
     private ExecutorService clientExecutor;
     private Thread serverThread;
+    private final Map<String, Translator> translatorCache = new ConcurrentHashMap<>();
 
     public static boolean isRunning() {
         return RUNNING.get();
@@ -128,6 +130,13 @@ public class LocalTranslationService extends Service {
     public void onDestroy() {
         stopServer();
         if (clientExecutor != null) clientExecutor.shutdownNow();
+        for (Translator translator : translatorCache.values()) {
+            try {
+                translator.close();
+            } catch (Throwable ignored) {
+            }
+        }
+        translatorCache.clear();
         super.onDestroy();
     }
 
@@ -317,10 +326,6 @@ public class LocalTranslationService extends Service {
                 respond(os, 200, payload);
             } catch (Exception e) {
                 respond(os, 500, json("error", e.getMessage() == null ? "translate failed" : e.getMessage()));
-            } finally {
-                if (translator != null) {
-                    try { translator.close(); } catch (Throwable ignored) {}
-                }
             }
 
         } catch (IOException e) {
@@ -444,12 +449,16 @@ public class LocalTranslationService extends Service {
         }
     }
 
+    //TODO reuse might be non-thread-safe, how to check it?
     private Translator createTranslator(String mlSrc, String mlDst) {
-        TranslatorOptions options = new TranslatorOptions.Builder()
-                .setSourceLanguage(mlSrc)
-                .setTargetLanguage(mlDst)
-                .build();
-        return Translation.getClient(options);
+        String key = mlSrc + "->" + mlDst;
+        return translatorCache.computeIfAbsent(key, ignored -> {
+            TranslatorOptions options = new TranslatorOptions.Builder()
+                    .setSourceLanguage(mlSrc)
+                    .setTargetLanguage(mlDst)
+                    .build();
+            return Translation.getClient(options);
+        });
     }
 
     /**
