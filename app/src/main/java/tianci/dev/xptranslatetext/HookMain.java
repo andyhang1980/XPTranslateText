@@ -1,8 +1,6 @@
 package tianci.dev.xptranslatetext;
 
-import android.app.Activity;
 import android.content.Context;
-import android.os.Bundle;
 import android.text.Editable;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
@@ -82,22 +80,6 @@ public class HookMain implements IXposedHookLoadPackage {
         hookAllCustomSetTextClasss(lpparam, finalSourceLang, finalTargetLang);
         hookWebView(lpparam, finalSourceLang, finalTargetLang);
 
-        XposedHelpers.findAndHookMethod(
-                "android.app.Activity",
-                lpparam.classLoader,
-                "onCreate",
-                Bundle.class,
-                new XC_MethodHook() {
-                    @Override
-                    protected void afterHookedMethod(MethodHookParam param) {
-                        Activity activity = (Activity) param.thisObject;
-                        Context context = activity.getApplicationContext();
-
-                        XposedBridge.log("Context: " + context.getPackageName());
-                        MultiSegmentTranslateTask.initDatabaseHelper(context);
-                    }
-                }
-        );
     }
 
     /**
@@ -341,10 +323,6 @@ public class HookMain implements IXposedHookLoadPackage {
                             return;
                         }
 
-                        int translationId = atomicIdGenerator.getAndIncrement();
-                        Object target = param.thisObject;
-                        markTranslationId(target, translationId);
-
                         List<Segment> segments;
                         if (originalText instanceof Spanned) {
                             segments = parseAllSegments((Spanned) originalText);
@@ -352,6 +330,20 @@ public class HookMain implements IXposedHookLoadPackage {
                             segments = new ArrayList<>();
                             segments.add(new Segment(0, originalText.length(), originalText.toString()));
                         }
+
+                        if (MultiSegmentTranslateTask.fillSegmentsFromCacheOrDbOrNoNeed(
+                                segments,
+                                finalSourceLang,
+                                finalTargetLang
+                        )) {
+                            CharSequence translated = buildSpannedFromSegments(segments);
+                            param.args[0] = translated;
+                            return;
+                        }
+
+                        int translationId = atomicIdGenerator.getAndIncrement();
+                        Object target = param.thisObject;
+                        markTranslationId(target, translationId);
 
                         // Mark in-progress before dispatching async work
                         setInProgress(param.thisObject, originalText);
@@ -447,9 +439,6 @@ public class HookMain implements IXposedHookLoadPackage {
 
                                         XposedBridge.log(String.format("[ translate ] %s string => %s", param.thisObject.getClass(), originalText));
 
-                                        int translationId = atomicIdGenerator.getAndIncrement();
-                                        markTranslationId(param.thisObject, translationId);
-
                                         List<Segment> segments;
                                         if (originalText instanceof Spanned) {
                                             segments = parseAllSegments((Spanned) originalText);
@@ -457,6 +446,19 @@ public class HookMain implements IXposedHookLoadPackage {
                                             segments = new ArrayList<>();
                                             segments.add(new Segment(0, originalText.length(), originalText.toString()));
                                         }
+
+                                        if (MultiSegmentTranslateTask.fillSegmentsFromCacheOrDbOrNoNeed(
+                                                segments,
+                                                finalSourceLang,
+                                                finalTargetLang
+                                        )) {
+                                            CharSequence translated = buildSpannedFromSegments(segments);
+                                            param.args[0] = translated;
+                                            return;
+                                        }
+
+                                        int translationId = atomicIdGenerator.getAndIncrement();
+                                        markTranslationId(param.thisObject, translationId);
 
                                         // Mark in-progress before dispatching async work
                                         setInProgress(param.thisObject, originalText);
