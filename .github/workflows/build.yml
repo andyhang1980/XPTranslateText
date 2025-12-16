@@ -46,6 +46,14 @@ jobs:
           chmod +x gradlew
           ./gradlew :app:assembleRelease :app-server:assembleRelease :app-hook:assembleRelease
 
+      - name: Collect APKs
+        run: |
+          mkdir -p artifacts
+          cp app/build/outputs/apk/release/*.apk artifacts/
+          cp app-server/build/outputs/apk/release/*.apk artifacts/
+          cp app-hook/build/outputs/apk/release/*.apk artifacts/
+          ls -la artifacts
+
       - name: Get Version Name
         id: version
         run: |
@@ -56,7 +64,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-apk-${{ steps.version.outputs.version_name }}
-          path: |
-            app/build/outputs/apk/release/*.apk
-            app-server/build/outputs/apk/release/*.apk
-            app-hook/build/outputs/apk/release/*.apk
+          path: artifacts
