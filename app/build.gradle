@@ -16,8 +16,8 @@ android {
         applicationId "tianci.dev.xptranslatetext"
         minSdk 29
         targetSdk 34
-        versionCode 2300
-        versionName "2.3.0"
+        versionCode Integer.parseInt(project.findProperty('XPTRANSLATETEXT_VERSION_CODE') ?: '1')
+        versionName (project.findProperty('XPTRANSLATETEXT_VERSION_NAME') ?: '0.0.0')
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
