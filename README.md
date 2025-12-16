@@ -1,28 +1,103 @@
 # Xposed Translate Text
 
-**Auto-translate app text prioritizing Local Cache and on-device [ML Kit (local server)](https://developers.google.com/ml-kit/language/translation), then [Gemini API](https://ai.google.dev/gemini-api/docs/pricing?hl=zh-tw#gemini-2.0-flash-lite), with fallback to the [Free Google API](https://github.com/ssut/py-googletrans/issues/268).**
+Auto-translate app text with a local-first pipeline: local cache → on-device
+[ML Kit (local server)](https://developers.google.com/ml-kit/language/translation) → [Gemini API](https://ai.google.dev/gemini-api/docs/pricing?hl=zh-tw#gemini-2.0-flash-lite) → [Free Google API](https://github.com/ssut/py-googletrans/issues/268).
 
-## ✨ What's New in 2.0
+## What's New
+
+### 3.0
+
+- Translation speed improvements by shifting language-pair handling to the local server and reducing hook-side work.
+- Refactored into a multi-module, multi-APK setup: full / hook-only / server-only.
+- Supports unroot environments (tested with NPatch v0.7.3): patch target app with hook-only + install server-only.
+
+### 2.0
 
 - Prioritize on-device translation via a built-in local server using **Google ML Kit**.
 - Added translation support for **android.text.StaticLayout$Builder** to reduce UI jank by replacing text synchronously when possible.
 
-## 📦 **Installation & Setup**
+## Installation & Setup
 
-### Requirements
-- [LSPosed](https://github.com/LSPosed/LSPosed) or another **Xposed Framework** variant must be installed and enabled.
+### Root (LSPosed / Xposed)
 
-### Installation Steps
+Requirements:
+- [LSPosed](https://github.com/LSPosed/LSPosed) (or another Xposed framework) installed and enabled.
 
-1. Install the downloaded APK from the link above.
-2. Open the **LSPosed Manager app**, navigate to **Modules**, and enable **XPTranslateText**.
-3. Select the apps you want to translate from the module settings in LSPosed.
-4. Open the XPTranslateText app, enable the "Local Translation Server" switch, and choose your source/target languages.
-5. Kill your app and restart it.
+Steps:
+1. Install the full APK (`app`).
+2. Open the LSPosed manager, enable **XPTranslateText**, and select your target apps.
+3. Open the app, enable the "Local Translation Server" switch, and configure settings.
+4. Force stop the target app and relaunch.
 
-After restart, the selected apps should display translated text automatically.
+### Unroot (NPatch / LSPatch)
 
-## 🛠️ Hook Methods & Translation Workflow
+Tested with:
+- NPatch v0.7.3
+
+Steps:
+1. Patch the target app with `app-hook` (hook-only APK).
+2. Install `app-server` (server-only APK).
+3. Open `app-server` and start the local translation server (manual start).
+4. Launch the patched target app.
+
+## Compatibility
+- Android 13 with LSPosed (v1.9.2-it(7024))
+- Android 15 with LSPosed (v1.9.2-it(7024))
+- Android 16 with LSPosed (v1.9.2-it(7412))
+- Unroot: NPatch v0.7.3 (hook-only + server-only)
+
+## Live Demo (Reddit Translation)
+
+<img src="images/translate-reddit.gif" width="300" alt="Live Reddit translation via on-device ML Kit" />
+
+## Before & After Comparison
+
+| Before                                    | After                                    |
+|-------------------------------------------|------------------------------------------|
+| <img src="images/before.png" width="300"> | <img src="images/after.png" width="300"> |
+
+## Project Structure
+
+```text
+XPTranslateText/
+├── app/                     # full APK (hook + server)
+├── app-hook/                # hook-only APK (for NPatch/LSPatch patching)
+├── app-server/              # server-only APK (manual start)
+├── core-hook/               # hook entry + client (no UI)
+├── core-server/             # local server + UI + resources
+├── app/libs/                # Xposed/Android API stubs (compileOnly)
+├── gradlew
+├── gradlew.bat
+├── keystore.properties      # Local-only, not committed
+└── settings.gradle
+```
+
+## Multiple APKs (full / hook-only / server-only)
+
+- `app` (full): For normal root / LSPosed usage (one APK includes hook + local server + UI).
+- `app-hook` (hook-only): For patchers like NPatch/LSPatch to embed the hook into a target app (no UI / no server).
+- `app-server` (server-only): Standalone local translation server app (manually start/stop).
+
+### Build Commands (Gradle Wrapper)
+
+- full Debug: `./gradlew :app:assembleDebug`
+- hook-only Debug: `./gradlew :app-hook:assembleDebug`
+- server-only Debug: `./gradlew :app-server:assembleDebug`
+- Requires Java 17 (macOS: `export JAVA_HOME=$(/usr/libexec/java_home -v 17)`)
+
+## Local ML Kit Server
+
+- Runs as a foreground service on `127.0.0.1:18181`.
+- Endpoint: `/translate?q=...` (`src`/`dst` are optional)
+  - If `src`/`dst` are omitted, the server uses saved settings from `xp_translate_text_configs`.
+  - `src=auto` enables automatic language detection (ML Kit Language ID).
+- Endpoint: `/config`
+  - Returns JSON: `{"code":0,"source_lang":"auto","target_lang":"zh-TW","force_wait_local":false}`
+  - `core-hook` reads this to avoid `XSharedPreferences` (works for both root and unroot / NPatch scenarios).
+  - Hook-side config cache TTL: **1s**; when language pair changes, the in-memory translation cache is cleared.
+- Models are downloaded on-demand and kept on-device; last-used times are tracked to help with maintenance.
+
+## Hook Methods & Translation Workflow
 - **android.widget.TextView & Custom Components:**
   - Automatically translates text set via the `setText()` method.
   - Translation pipeline:
@@ -40,41 +115,6 @@ After restart, the selected apps should display translated text automatically.
   - Performs real-time translation of visible webpage text via a JS bridge.
   - Pipeline: **Local ML Kit Server → Gemini API → Free Google API** (no caching for WebView).
 
-## ✅ **Compatibility**
-- Tested and confirmed working on:
-    - Android 13 with LSPosed (v1.9.2-it(7024))
-    - Android 15 with LSPosed (v1.9.2-it(7024))
-    - Android 16 with LSPosed (v1.9.2-it(7412))
-
-## 🎬 Live Demo (Reddit Translation)
-
-<img src="images/translate-reddit.gif" width="300" alt="Live Reddit translation via on-device ML Kit" />
-
-## 🖼️ **Before & After Comparison**
-
-| Before                                    | After                                    |
-|-------------------------------------------|------------------------------------------|
-| <img src="images/before.png" width="300"> | <img src="images/after.png" width="300"> |
-
-## 📁 **Project Structure**
-
-```text
-XPTranslateText/
-├── app/
-│   ├── key.jks              # Generated by GitHub Actions
-│   └── build.gradle
-├── gradlew
-├── gradlew.bat
-├── keystore.properties      # Local-only, not committed
-└── settings.gradle
-```
-
-## 🧩 Local ML Kit Server
-
-- Runs as a foreground service on `127.0.0.1:18181`.
-- Endpoint: `/translate?src=xx&dst=yy&q=...`
-  - `src=auto` enables automatic language detection (ML Kit Language ID).
-- Models are downloaded on-demand and kept on-device; last-used times are tracked to help with maintenance.
 
 ## Star History
 

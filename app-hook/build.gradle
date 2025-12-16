@@ -9,17 +9,15 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace 'tianci.dev.xptranslatetext'
+    namespace 'tianci.dev.xptranslatetext.app.hook'
     compileSdk 34
 
     defaultConfig {
-        applicationId "tianci.dev.xptranslatetext"
+        applicationId "tianci.dev.xptranslatetext.hook"
         minSdk 29
         targetSdk 34
         versionCode Integer.parseInt(project.findProperty('XPTRANSLATETEXT_VERSION_CODE') ?: '1')
         versionName (project.findProperty('XPTRANSLATETEXT_VERSION_NAME') ?: '0.0.0')
-
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -51,16 +49,11 @@ android {
     applicationVariants.all { variant ->
         variant.outputs.all { output ->
             def versionName = variant.versionName
-            outputFileName = "XPTranslateText-${versionName}.apk"
+            outputFileName = "XPTranslateText-Hook-${versionName}.apk"
         }
     }
 }
 
 dependencies {
     implementation project(':core-hook')
-    implementation project(':core-server')
-
-    testImplementation libs.junit
-    androidTestImplementation libs.ext.junit
-    androidTestImplementation libs.espresso.core
 }

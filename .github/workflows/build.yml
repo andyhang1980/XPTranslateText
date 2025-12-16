@@ -44,16 +44,24 @@ jobs:
       - name: Build with Gradle
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease
+          ./gradlew :app:assembleRelease :app-server:assembleRelease :app-hook:assembleRelease
+
+      - name: Collect APKs
+        run: |
+          mkdir -p artifacts
+          cp app/build/outputs/apk/release/*.apk artifacts/
+          cp app-server/build/outputs/apk/release/*.apk artifacts/
+          cp app-hook/build/outputs/apk/release/*.apk artifacts/
+          ls -la artifacts
 
       - name: Get Version Name
         id: version
         run: |
-          VERSION_NAME=$(grep "versionName" app/build.gradle | awk -F '"' '{print $2}' | head -n 1)
+          VERSION_NAME=$(grep "^XPTRANSLATETEXT_VERSION_NAME=" gradle.properties | cut -d'=' -f2 | head -n 1)
           echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: release-apk-${{ steps.version.outputs.version_name }}
-          path: app/build/outputs/apk/release/*.apk
+          path: artifacts

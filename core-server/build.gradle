@@ -1,0 +1,35 @@
+plugins {
+    alias(libs.plugins.android.library)
+}
+
+android {
+    namespace 'tianci.dev.xptranslatetext.core.server'
+    compileSdk 34
+
+    defaultConfig {
+        minSdk 29
+        targetSdk 34
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation libs.appcompat
+    implementation libs.material
+    implementation libs.recyclerview
+    implementation 'androidx.preference:preference:1.2.1'
+
+    implementation libs.mlkit.translate
+    implementation libs.mlkit.language.id
+
+    testImplementation libs.junit
+    androidTestImplementation libs.ext.junit
+    androidTestImplementation libs.espresso.core
+}
+
