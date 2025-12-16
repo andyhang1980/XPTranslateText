@@ -9,11 +9,11 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace 'tianci.dev.xptranslatetext'
+    namespace 'tianci.dev.xptranslatetext.app.server'
     compileSdk 34
 
     defaultConfig {
-        applicationId "tianci.dev.xptranslatetext"
+        applicationId "tianci.dev.xptranslatetext.server"
         minSdk 29
         targetSdk 34
         versionCode 2300
@@ -51,16 +51,12 @@ android {
     applicationVariants.all { variant ->
         variant.outputs.all { output ->
             def versionName = variant.versionName
-            outputFileName = "XPTranslateText-${versionName}.apk"
+            outputFileName = "XPTranslateText-Server-${versionName}.apk"
         }
     }
 }
 
 dependencies {
-    implementation project(':core-hook')
     implementation project(':core-server')
-
-    testImplementation libs.junit
-    androidTestImplementation libs.ext.junit
-    androidTestImplementation libs.espresso.core
 }
+

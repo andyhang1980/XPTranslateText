@@ -29,7 +29,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import tianci.dev.xptranslatetext.R;
+import tianci.dev.xptranslatetext.core.server.R;
 import tianci.dev.xptranslatetext.data.TranslationDatabaseHelper;
 import tianci.dev.xptranslatetext.util.ModelInfoUtil;
 import tianci.dev.xptranslatetext.util.KeyObfuscator;
@@ -283,6 +283,11 @@ public class LocalTranslationService extends Service {
 
             if (path.startsWith("/health")) {
                 respond(os, 200, json("status", "ok"));
+                return;
+            }
+
+            if (path.startsWith("/config")) {
+                respond(os, 200, configPayload());
                 return;
             }
 
@@ -653,6 +658,23 @@ public class LocalTranslationService extends Service {
 
     private static String failurePayload(String message) {
         return "{\"code\":1,\"error\":" + jsonString(message) + "}";
+    }
+
+    private String configPayload() {
+        SharedPreferences sp = getSharedPreferences("xp_translate_text_configs", MODE_PRIVATE);
+        String src = sp.getString("source_lang", "auto");
+        String dst = sp.getString("target_lang", "zh-TW");
+        boolean forceWaitLocal = sp.getBoolean("force_wait_local", false);
+
+        if (src == null || src.isEmpty()) src = "auto";
+        if (dst == null || dst.isEmpty()) dst = "zh-TW";
+
+        return "{"
+                + "\"code\":0,"
+                + "\"source_lang\":" + jsonString(src) + ","
+                + "\"target_lang\":" + jsonString(dst) + ","
+                + "\"force_wait_local\":" + forceWaitLocal
+                + "}";
     }
 
     /**

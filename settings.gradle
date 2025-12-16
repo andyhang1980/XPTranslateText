@@ -25,3 +25,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "XPTranslateText"
 include ':app'
+include ':core-hook'
+include ':core-server'
+include ':app-hook'
+include ':app-server'

@@ -26,7 +26,6 @@ import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
-import de.robv.android.xposed.XSharedPreferences;
 import tianci.dev.xptranslatetext.rules.Telegram;
 import tianci.dev.xptranslatetext.translate.MultiSegmentTranslateTask;
 import tianci.dev.xptranslatetext.translate.Segment;
@@ -44,42 +43,21 @@ public class HookMain implements IXposedHookLoadPackage {
     public static final String TRANSLATION_ID_KEY = "xp_translate_text:translationId";
     public static final String TRANSLATION_IN_PROGRESS_KEY = "xp_translate_text:in_progress";
     public static final String TRANSLATION_IN_PROGRESS_TEXT_KEY = "xp_translate_text:in_progress_text";
-    public static final String PREF_FORCE_WAIT_LOCAL = "force_wait_local";
 
     @Override
     public void handleLoadPackage(final XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
-        if (lpparam.packageName.equals("tianci.dev.xptranslatetext")) return;
+        if (lpparam.packageName == null) return;
+        if (lpparam.packageName.startsWith("tianci.dev.xptranslatetext")) return;
 
         XposedBridge.log("package => " + lpparam.packageName);
 
-        XSharedPreferences prefs = new XSharedPreferences("tianci.dev.xptranslatetext", "xp_translate_text_configs");
+        // Hook-side preferences are fetched from the local server via /config.
+        MultiSegmentTranslateTask.prefetchServerConfigAsync();
 
-        String sourceLang = "auto";
-        String targetLang = "zh-TW";
-        boolean forceWaitLocal = false;
-
-        if (prefs.getFile().canRead()) {
-            prefs.reload();
-            sourceLang = prefs.getString("source_lang", sourceLang);
-            targetLang = prefs.getString("target_lang", targetLang);
-            forceWaitLocal = prefs.getBoolean(PREF_FORCE_WAIT_LOCAL, false);
-
-            XposedBridge.log("sourceLang=" + sourceLang + ", targetLang=" + targetLang
-                    + ", forceWaitLocal=" + forceWaitLocal);
-        } else {
-            XposedBridge.log("Cannot read XSharedPreferences => " + prefs.getFile().getAbsolutePath()
-                    + ". Fallback to default: auto->zh-TW");
-        }
-
-        final String finalSourceLang = sourceLang;
-        final String finalTargetLang = targetLang;
-        final boolean finalForceWaitLocal = forceWaitLocal;
-
-        hookTextView(lpparam, finalSourceLang, finalTargetLang);
-        hookStaticLayout(lpparam, finalSourceLang, finalTargetLang, finalForceWaitLocal);
-        hookAllCustomSetTextClasss(lpparam, finalSourceLang, finalTargetLang);
-        hookWebView(lpparam, finalSourceLang, finalTargetLang);
-
+        hookTextView(lpparam);
+        hookStaticLayout(lpparam);
+        hookAllCustomSetTextClasss(lpparam);
+        hookWebView(lpparam);
     }
 
     /**
@@ -88,10 +66,7 @@ public class HookMain implements IXposedHookLoadPackage {
      * - If unresolved, try quick local-service translation (background I/O + short await on UI)
      * - If still unresolved, prefetch async and return original layout
      */
-    private void hookStaticLayout(XC_LoadPackage.LoadPackageParam lpparam,
-                                  String finalSourceLang,
-                                  String finalTargetLang,
-                                  boolean forceWaitLocal) {
+    private void hookStaticLayout(XC_LoadPackage.LoadPackageParam lpparam) {
         try {
             XposedHelpers.findAndHookMethod(
                     "android.text.StaticLayout$Builder",
@@ -176,12 +151,13 @@ public class HookMain implements IXposedHookLoadPackage {
                                 try {
                                     // 1) memory/DB sync fast-path
                                     boolean allResolved = MultiSegmentTranslateTask.fillSegmentsFromCacheOrDbOrNoNeed(
-                                            segments, finalSourceLang, finalTargetLang);
+                                            segments);
 
                                     // 2) quick local-service sync (short wait) if not all resolved
                                     if (!allResolved) {
+                                        boolean forceWaitLocal = MultiSegmentTranslateTask.getForceWaitLocalSnapshot();
                                         boolean nowResolved = MultiSegmentTranslateTask.quickTranslateUnresolvedSegmentsViaLocal(
-                                                segments, finalSourceLang, finalTargetLang, 1000 /*ms*/, forceWaitLocal);
+                                                segments, 1000 /*ms*/, forceWaitLocal);
                                         if (nowResolved) {
                                             allResolved = true;
                                         }
@@ -210,7 +186,7 @@ public class HookMain implements IXposedHookLoadPackage {
                                         return XposedBridge.invokeOriginalMethod(param.method, param.thisObject, param.args);
                                     } else {
                                         // 3) prefetch async for next time
-                                        MultiSegmentTranslateTask.prefetchSegmentsAsync(segments, finalSourceLang, finalTargetLang);
+                                        MultiSegmentTranslateTask.prefetchSegmentsAsync(segments);
                                         return XposedBridge.invokeOriginalMethod(param.method, param.thisObject, param.args);
                                     }
                                 } finally {
@@ -228,7 +204,7 @@ public class HookMain implements IXposedHookLoadPackage {
         }
     }
 
-    private void hookWebView(XC_LoadPackage.LoadPackageParam lpparam, String finalSourceLang, String finalTargetLang) {
+    private void hookWebView(XC_LoadPackage.LoadPackageParam lpparam) {
         XposedHelpers.findAndHookConstructor(
                 "android.webkit.WebView",
                 lpparam.classLoader,
@@ -268,7 +244,7 @@ public class HookMain implements IXposedHookLoadPackage {
 
                         XposedBridge.log("onPageFinished => " + url);
 
-                        String jsCode = buildExtractTextJS(finalSourceLang, finalTargetLang);
+                        String jsCode = buildExtractTextJS();
 
                         webView.post(() -> {
                             webView.evaluateJavascript(jsCode, null);
@@ -278,7 +254,7 @@ public class HookMain implements IXposedHookLoadPackage {
         );
     }
 
-    private void hookTextView(XC_LoadPackage.LoadPackageParam lpparam, String finalSourceLang, String finalTargetLang) {
+    private void hookTextView(XC_LoadPackage.LoadPackageParam lpparam) {
         XposedHelpers.findAndHookMethod(
                 "android.widget.TextView",
                 lpparam.classLoader,
@@ -332,9 +308,7 @@ public class HookMain implements IXposedHookLoadPackage {
                         }
 
                         if (MultiSegmentTranslateTask.fillSegmentsFromCacheOrDbOrNoNeed(
-                                segments,
-                                finalSourceLang,
-                                finalTargetLang
+                                segments
                         )) {
                             CharSequence translated = buildSpannedFromSegments(segments);
                             param.args[0] = translated;
@@ -352,16 +326,14 @@ public class HookMain implements IXposedHookLoadPackage {
                         MultiSegmentTranslateTask.translateSegmentsAsync(
                                 param,
                                 translationId,
-                                segments,
-                                finalSourceLang,
-                                finalTargetLang
+                                segments
                         );
                     }
                 }
         );
     }
 
-    private void hookAllCustomSetTextClasss(XC_LoadPackage.LoadPackageParam lpparam, String finalSourceLang, String finalTargetLang) {
+    private void hookAllCustomSetTextClasss(XC_LoadPackage.LoadPackageParam lpparam) {
         try {
             Field pathListField = XposedHelpers.findField(lpparam.classLoader.getClass(), "pathList");
             Object pathList = pathListField.get(lpparam.classLoader);
@@ -448,9 +420,7 @@ public class HookMain implements IXposedHookLoadPackage {
                                         }
 
                                         if (MultiSegmentTranslateTask.fillSegmentsFromCacheOrDbOrNoNeed(
-                                                segments,
-                                                finalSourceLang,
-                                                finalTargetLang
+                                                segments
                                         )) {
                                             CharSequence translated = buildSpannedFromSegments(segments);
                                             param.args[0] = translated;
@@ -466,9 +436,7 @@ public class HookMain implements IXposedHookLoadPackage {
                                         MultiSegmentTranslateTask.translateSegmentsAsync(
                                                 param,
                                                 translationId,
-                                                segments,
-                                                finalSourceLang,
-                                                finalTargetLang
+                                                segments
                                         );
                                     }
                                 });
@@ -663,7 +631,7 @@ public class HookMain implements IXposedHookLoadPackage {
         return ssb;
     }
 
-    private String buildExtractTextJS(String finalSourceLang, String finalTargetLang) {
+    private String buildExtractTextJS() {
         return ""
                 + "const EXCLUDE_TAGS = ['SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME', 'SVG', 'CANVAS', 'HEAD', 'META', 'LINK'];\n"
                 + "function extractAllTextNodes(rootElement, minLength = 20) {\n"
@@ -725,7 +693,7 @@ public class HookMain implements IXposedHookLoadPackage {
                 + "        }, TIMEOUT_MS);\n"
                 + "        pendingTranslations[requestId].timeoutId = timeoutId;\n"
                 + "        try {\n"
-                + "            window.XPTranslateTextBridge.translateFromJs(requestId, originalText, '" + finalSourceLang + "', '" + finalTargetLang + "');\n"
+                + "            window.XPTranslateTextBridge.translateFromJs(requestId, originalText, '', '');\n"
                 + "        } catch(err) {\n"
                 + "            console.error('[XPTranslate] translateFromJs error =>', err);\n"
                 + "            clearTimeout(timeoutId);\n"
