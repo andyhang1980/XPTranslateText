@@ -26,7 +26,10 @@ import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
-import tianci.dev.xptranslatetext.rules.Telegram;
+import tianci.dev.xptranslatetext.rules.Instagram;
+import tianci.dev.xptranslatetext.rules.Reddit;
+import tianci.dev.xptranslatetext.rules.Discord;
+import tianci.dev.xptranslatetext.rules.Twitter;
 import tianci.dev.xptranslatetext.translate.MultiSegmentTranslateTask;
 import tianci.dev.xptranslatetext.translate.Segment;
 import tianci.dev.xptranslatetext.translate.SpanSpec;
@@ -455,7 +458,10 @@ public class HookMain implements IXposedHookLoadPackage {
 
     private boolean isTranslationSkippedForClass(String packageName, String className) {
         return switch (packageName) {
-            case "org.telegram.messenger" -> Telegram.shouldSkipClass(className);
+            case "com.instagram.android" -> Instagram.shouldSkipClass(className);
+            case "com.reddit.frontpage" -> Reddit.shouldSkipClass(className);
+            case "com.discord" -> Discord.shouldSkipClass(className);
+            case "com.twitter.android", "com.twitter.android.alpha", "app.revanced.android.apps.twitter" -> Twitter.shouldSkipClass(className);
             default -> false;
         };
     }
