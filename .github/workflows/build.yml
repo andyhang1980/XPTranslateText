@@ -8,6 +8,9 @@ on:
       - release
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build on ${{ matrix.os }}
@@ -31,22 +34,36 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Write Keys
+      - name: Prepare signing keystore
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ ! -z "${{ secrets.KEY_STORE }}" ]; then
+            echo "Using KEY_STORE secret."
             echo androidStorePassword='${{ secrets.KEY_STORE_PASSWORD }}' >> keystore.properties
             echo androidKeyAlias='${{ secrets.ALIAS }}' >> keystore.properties
             echo androidKeyPassword='${{ secrets.KEY_PASSWORD }}' >> keystore.properties
             echo androidStoreFile='key.jks' >> keystore.properties
             echo "${{ secrets.KEY_STORE }}" | base64 --decode > app/key.jks
           else
-            echo "No KEY_STORE secret found; generating a self-signed keystore for this build."
-            keytool -genkeypair -v \
-              -keystore app/key.jks \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -alias xp \
-              -dname "CN=XPTranslateText, OU=CI, O=XPTranslateText, L=CI, S=CI, C=US" \
-              -storepass xp123456 -keypass xp123456
+            if [ ! -f app/key.jks ]; then
+              echo "No fixed keystore found; generating one (alias=xp) and committing it..."
+              keytool -genkeypair -v \
+                -keystore app/key.jks \
+                -keyalg RSA -keysize 2048 -validity 10000 \
+                -alias xp \
+                -dname "CN=XPTranslateText, OU=CI, O=XPTranslateText, L=CI, S=CI, C=US" \
+                -storepass xp123456 -keypass xp123456
+              if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref_name }}" = "master" ]; then
+                git config user.email "ci@github.com"
+                git config user.name "github-actions[bot]"
+                git add -f app/key.jks
+                git commit -m "ci: add fixed signing keystore" || echo "nothing to commit"
+                git push https://x-access-token:${TOKEN}@github.com/${{ github.repository }}.git HEAD:${{ github.ref_name }}
+              fi
+            else
+              echo "Reusing committed fixed signing keystore."
+            fi
             echo androidStorePassword='xp123456' >> keystore.properties
             echo androidKeyAlias='xp' >> keystore.properties
             echo androidKeyPassword='xp123456' >> keystore.properties
