@@ -435,7 +435,15 @@ public class LocalTranslationService extends Service {
             }
         }
 
-        if (GEMINI_API_KEYS.length > 0) {
+        // Online LLM stage: a user-configured OpenAI-compatible provider (DeepSeek /
+        // SiliconFlow / custom) replaces Gemini as the only online LLM when enabled.
+        if (shouldUseCustomLlm()) {
+            String llmResult = translateByCustomLlm(payload, dst, cacheKey);
+            Log.d(TAG, String.format("[%s] translate by custom llm => %s", cacheKey, llmResult));
+            if (llmResult != null && !llmResult.isEmpty()) {
+                return llmResult;
+            }
+        } else if (GEMINI_API_KEYS.length > 0) {
             String geminiResult = translateByGemini(payload, dst, cacheKey);
             Log.d(TAG, String.format("[%s] translate by gemini => %s", cacheKey, geminiResult));
             if (geminiResult != null && !geminiResult.isEmpty()) {
@@ -574,6 +582,114 @@ public class LocalTranslationService extends Service {
             }
         } catch (Exception e) {
             Log.w(TAG, String.format(Locale.ROOT, "[%s] Google free API failed => %s", cacheKey, e.getMessage()));
+            return null;
+        }
+    }
+
+    // ====== Custom OpenAI-compatible LLM (DeepSeek / SiliconFlow / etc.) ======
+    /**
+     * Returns true when the user has enabled a custom LLM and supplied at least a
+     * base URL and a model name. When disabled, the pipeline falls back to Gemini.
+     */
+    private boolean shouldUseCustomLlm() {
+        try {
+            SharedPreferences sp = getSharedPreferences("xp_translate_text_configs", MODE_PRIVATE);
+            if (!sp.getBoolean("llm_enabled", false)) return false;
+            String baseUrl = sp.getString("llm_base_url", null);
+            String model = sp.getString("llm_model", null);
+            return baseUrl != null && !baseUrl.trim().isEmpty()
+                    && model != null && !model.trim().isEmpty();
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private String translateByCustomLlm(String text, String dst, String cacheKey) {
+        try {
+            SharedPreferences sp = getSharedPreferences("xp_translate_text_configs", MODE_PRIVATE);
+            String baseUrl = (sp.getString("llm_base_url", "") == null ? "" : sp.getString("llm_base_url", "")).trim();
+            String apiKey = sp.getString("llm_api_key", "");
+            String model = (sp.getString("llm_model", "") == null ? "" : sp.getString("llm_model", "")).trim();
+            if (baseUrl.isEmpty() || model.isEmpty()) return null;
+
+            String endpoint = baseUrl.replaceAll("/+$", "") + "/chat/completions";
+            String systemPrompt = "You are a professional translator. Translate the following text into "
+                    + dst + " only. Output ONLY the translated text, with no explanations, no notes, and no markdown formatting.";
+            String requestBody = buildOpenAiRequestBody(model, systemPrompt, text);
+
+            Log.i(TAG, String.format(Locale.ROOT, "[%s] Custom LLM request => %s", cacheKey, endpoint));
+
+            HttpURLConnection conn = (HttpURLConnection) new URL(endpoint).openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json");
+            if (apiKey != null && !apiKey.trim().isEmpty()) {
+                conn.setRequestProperty("Authorization", "Bearer " + apiKey.trim());
+            }
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36");
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(15000);
+            conn.setDoOutput(true);
+
+            try (OutputStream os = conn.getOutputStream()) {
+                byte[] input = requestBody.getBytes(StandardCharsets.UTF_8);
+                os.write(input, 0, input.length);
+                os.flush();
+            }
+
+            int status = conn.getResponseCode();
+            if (status != 200) {
+                InputStream errorStream = conn.getErrorStream();
+                if (errorStream != null) {
+                    try (BufferedReader errIn = new BufferedReader(new InputStreamReader(errorStream, StandardCharsets.UTF_8))) {
+                        StringBuilder errSb = new StringBuilder();
+                        String errLine;
+                        while ((errLine = errIn.readLine()) != null) {
+                            errSb.append(errLine);
+                        }
+                        Log.w(TAG, String.format(Locale.ROOT, "[%s] Custom LLM error (%d) => %s", cacheKey, status, errSb));
+                    } catch (Exception ignored) {
+                    }
+                }
+                return null;
+            }
+
+            try (BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = in.readLine()) != null) {
+                    sb.append(line);
+                }
+                return parseOpenAiResult(cacheKey, sb.toString());
+            }
+        } catch (Exception e) {
+            Log.w(TAG, String.format(Locale.ROOT, "[%s] Custom LLM call failed => %s", cacheKey, e.getMessage()));
+            return null;
+        }
+    }
+
+    private static String buildOpenAiRequestBody(String model, String systemPrompt, String text) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"model\":").append(jsonString(model));
+        sb.append(",\"messages\":[");
+        sb.append("{\"role\":\"system\",\"content\":").append(jsonString(systemPrompt)).append("}");
+        sb.append(",{\"role\":\"user\",\"content\":").append(jsonString(text)).append("}");
+        sb.append("],\"temperature\":0.3,\"stream\":false}");
+        return sb.toString();
+    }
+
+    private String parseOpenAiResult(String cacheKey, String json) {
+        try {
+            JSONObject root = new JSONObject(json);
+            JSONArray choices = root.optJSONArray("choices");
+            if (choices == null || choices.length() == 0) return null;
+            JSONObject choice = choices.getJSONObject(0);
+            JSONObject message = choice.optJSONObject("message");
+            if (message == null) return null;
+            String content = message.optString("content", null);
+            if (content == null) return null;
+            return content.trim();
+        } catch (JSONException e) {
+            Log.w(TAG, String.format(Locale.ROOT, "[%s] Custom LLM parse failure => %s", cacheKey, e.getMessage()));
             return null;
         }
     }
