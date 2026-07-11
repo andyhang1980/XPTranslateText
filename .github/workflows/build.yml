@@ -39,6 +39,18 @@ jobs:
             echo androidKeyPassword='${{ secrets.KEY_PASSWORD }}' >> keystore.properties
             echo androidStoreFile='key.jks' >> keystore.properties
             echo "${{ secrets.KEY_STORE }}" | base64 --decode > app/key.jks
+          else
+            echo "No KEY_STORE secret found; generating a self-signed keystore for this build."
+            keytool -genkeypair -v \
+              -keystore app/key.jks \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -alias xp \
+              -dname "CN=XPTranslateText, OU=CI, O=XPTranslateText, L=CI, S=CI, C=US" \
+              -storepass xp123456 -keypass xp123456
+            echo androidStorePassword='xp123456' >> keystore.properties
+            echo androidKeyAlias='xp' >> keystore.properties
+            echo androidKeyPassword='xp123456' >> keystore.properties
+            echo androidStoreFile='key.jks' >> keystore.properties
           fi
 
       - name: Build with Gradle
