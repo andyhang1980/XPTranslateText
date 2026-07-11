@@ -115,6 +115,41 @@ XPTranslateText/
   - Performs real-time translation of visible webpage text via a JS bridge.
   - Pipeline: **Local ML Kit Server → Gemini API → Free Google API** (no caching for WebView).
 
+## Custom LLM (DeepSeek / SiliconFlow / OpenAI-compatible)
+
+You can replace Gemini with any OpenAI-compatible chat API (DeepSeek, SiliconFlow/硅基流动, OpenAI,
+local LLMs like Ollama, etc.) as the online translation backend.
+
+1. Open the app → **Custom LLM** card → **Configure custom LLM**.
+2. Toggle **Enable custom LLM**.
+3. Pick a provider preset (DeepSeek / SiliconFlow) or **Custom** and fill in:
+   - **API Base URL** — e.g. `https://api.deepseek.com/v1` or `https://api.siliconflow.cn/v1`.
+   - **API Key** — leave empty for keyless/local endpoints.
+   - **Model** — e.g. `deepseek-chat`, `Qwen/Qwen2.5-7B-Instruct`.
+4. Save. Changes apply immediately (no server restart needed).
+
+The request is a standard `POST {base_url}/chat/completions` call:
+
+```json
+{
+  "model": "<model>",
+  "messages": [
+    {"role": "system", "content": "Translate the following text into <target_lang> only..."},
+    {"role": "user", "content": "<text>"}
+  ],
+  "temperature": 0.3,
+  "stream": false
+}
+```
+
+Resulting translation pipeline (when custom LLM is enabled):
+
+```text
+Local ML Kit Server → Custom LLM (OpenAI-compatible) → Free Google API (final fallback)
+```
+
+When the custom LLM is disabled, the original **Gemini API → Free Google API** pipeline is used.
+
 
 ## Star History
 
