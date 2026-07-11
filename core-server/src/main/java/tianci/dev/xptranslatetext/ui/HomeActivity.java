@@ -65,6 +65,9 @@ public class HomeActivity extends AppCompatActivity {
         findViewById(R.id.btn_model_manager).setOnClickListener(v -> {
             startActivity(new Intent(this, ModelManagerActivity.class));
         });
+        findViewById(R.id.btn_llm_settings).setOnClickListener(v -> {
+            startActivity(new Intent(this, LlmSettingsActivity.class));
+        });
 
         setupLanguageDropdowns();
         loadInitialSelections();
