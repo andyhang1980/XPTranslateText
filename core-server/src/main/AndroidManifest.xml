@@ -24,6 +24,11 @@
             android:exported="false"
             android:label="@string/model_manager_title" />
 
+        <activity
+            android:name="tianci.dev.xptranslatetext.ui.LlmSettingsActivity"
+            android:exported="false"
+            android:label="@string/llm_settings_title" />
+
         <service
             android:name="tianci.dev.xptranslatetext.service.LocalTranslationService"
             android:exported="false"
