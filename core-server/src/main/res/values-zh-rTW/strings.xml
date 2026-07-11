@@ -29,4 +29,21 @@
     <string name="label_auto_detect">自動偵測 (auto)</string>
     <string name="label_lang_zh_tw">中文（繁體）</string>
     <string name="label_lang_zh_cn">中文（簡體）</string>
+    <!-- Custom LLM (DeepSeek / SiliconFlow / OpenAI-compatible) -->
+    <string name="llm_section_title">自訂大模型</string>
+    <string name="configure_llm">設定自訂大模型</string>
+    <string name="llm_section_hint">使用 OpenAI 相容 API（DeepSeek、硅基流動等）作為線上翻譯後端，取代 Gemini。</string>
+    <string name="llm_settings_title">自訂大模型設定</string>
+    <string name="llm_enable">啟用自訂大模型</string>
+    <string name="llm_enable_hint">啟用後將以 OpenAI 相容 API 取代 Gemini，Google 免費 API 仍作為最後兜底。</string>
+    <string name="llm_provider">供應商</string>
+    <string name="llm_provider_deepseek">DeepSeek</string>
+    <string name="llm_provider_siliconflow">硅基流動 (SiliconFlow)</string>
+    <string name="llm_provider_custom">自訂</string>
+    <string name="llm_base_url">API 基礎網址</string>
+    <string name="llm_api_key">API 金鑰</string>
+    <string name="llm_model">模型名稱</string>
+    <string name="llm_save">儲存</string>
+    <string name="llm_saved">已儲存</string>
+    <string name="llm_save_incomplete">已啟用但未填寫基礎網址 / 模型，將退回 Gemini / Google 翻譯。</string>
 </resources>
