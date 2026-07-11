@@ -29,4 +29,21 @@
     <string name="label_auto_detect">Auto Detect (auto)</string>
     <string name="label_lang_zh_tw">Chinese (Traditional)</string>
     <string name="label_lang_zh_cn">Chinese (Simplified)</string>
+    <!-- Custom LLM (DeepSeek / SiliconFlow / OpenAI-compatible) -->
+    <string name="llm_section_title">Custom LLM</string>
+    <string name="configure_llm">Configure custom LLM</string>
+    <string name="llm_section_hint">Use an OpenAI-compatible API (DeepSeek, SiliconFlow, etc.) as the online translation backend, replacing Gemini.</string>
+    <string name="llm_settings_title">Custom LLM Settings</string>
+    <string name="llm_enable">Enable custom LLM</string>
+    <string name="llm_enable_hint">When enabled, an OpenAI-compatible API is used instead of Gemini. Google Free API remains the final fallback.</string>
+    <string name="llm_provider">Provider</string>
+    <string name="llm_provider_deepseek">DeepSeek</string>
+    <string name="llm_provider_siliconflow">SiliconFlow (硅基流动)</string>
+    <string name="llm_provider_custom">Custom</string>
+    <string name="llm_base_url">API Base URL</string>
+    <string name="llm_api_key">API Key</string>
+    <string name="llm_model">Model</string>
+    <string name="llm_save">Save</string>
+    <string name="llm_saved">Saved</string>
+    <string name="llm_save_incomplete">Enabled but Base URL / Model is empty — translation will fall back to Gemini / Google.</string>
 </resources>
